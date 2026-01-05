@@ -44,8 +44,8 @@ export async function createMilestone(prevState: MilestoneState, formData: FormD
     }
   }
 
-  const { projectId,MQ, title, description, amount, due_date, status } = validatedFields.data
-  
+  const { projectId, title, description, amount, due_date, status } = validatedFields.data
+
   const supabase = await createClient()
 
   const { error } = await supabase.from('milestones').insert({
