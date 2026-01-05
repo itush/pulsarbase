@@ -21,8 +21,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { createProject } from '@/actions/create-project'
-import { useActionState } from 'react'
 
 const formSchema = z.object({
     name: z.string().min(3, {
@@ -33,13 +36,8 @@ const formSchema = z.object({
 })
 
 export function NewProjectForm() {
-    // We are using a simple client-side wrapper around the Server Action for now
-    // or we can just stick to standard form submission if we want progressive enhancement
-    // But for better UX with Shadcn Form, we often bind it.
-
-    // Actually, Shadcn Form is best used with onSubmit handler.
-    // To mix Server Actions + Shadcn Form (RHF), we usually invoke the action in onSubmit.
-
+    const router = useRouter()
+    const [isLoading, setIsLoading] = useState(false)
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -50,14 +48,28 @@ export function NewProjectForm() {
     })
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
+        setIsLoading(true)
         const formData = new FormData()
         formData.append('name', values.name)
         formData.append('status', values.status)
         if (values.total_budget) formData.append('total_budget', values.total_budget)
 
-        // We call the server action directly here
-        // In a real app we might want to handle loading state/errors better with useTransition
-        await createProject({}, formData)
+        try {
+            const result = await createProject({}, formData)
+            if (result?.message && result.message !== 'success') { // Assuming action returns message on error
+                toast.error(result.message)
+            } else if (result?.errors) {
+                toast.error('Please check the form for errors.')
+            } else {
+                toast.success('Project created successfully')
+                router.push('/dashboard')
+                router.refresh()
+            }
+        } catch (error) {
+            toast.error('Something went wrong. Please try again.')
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -116,7 +128,10 @@ export function NewProjectForm() {
                         )}
                     />
                 </div>
-                <Button type="submit">Create Project</Button>
+                <Button type="submit" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Create Project
+                </Button>
             </form>
         </Form>
     )

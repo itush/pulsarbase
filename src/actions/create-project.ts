@@ -70,5 +70,5 @@ export async function createProject(prevState: CreateProjectState, formData: For
     }
 
     revalidatePath('/dashboard')
-    redirect('/dashboard')
+    return { message: 'success' }
 }

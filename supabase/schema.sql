@@ -1,7 +1,4 @@
--- Enable Row Level Security
-alter table auth.users enable row level security;
-
--- 1. Profiles Table (Extends auth.users)
+-- 1. Profiles Table
 create table public.profiles (
   id uuid not null references auth.users(id) on delete cascade primary key,
   email text not null,
@@ -10,7 +7,6 @@ create table public.profiles (
   avatar_url text,
   created_at timestamptz default now()
 );
-
 alter table public.profiles enable row level security;
 
 -- 2. Projects Table
@@ -24,7 +20,6 @@ create table public.projects (
   total_budget numeric,
   created_at timestamptz default now()
 );
-
 alter table public.projects enable row level security;
 
 -- 3. Milestones Table
@@ -40,7 +35,6 @@ create table public.milestones (
   due_date date,
   created_at timestamptz default now()
 );
-
 alter table public.milestones enable row level security;
 
 -- 4. Assets Table
@@ -52,10 +46,9 @@ create table public.assets (
   type text check (type in ('design', 'document', 'invoice', 'video', 'other')) default 'other',
   created_at timestamptz default now()
 );
-
 alter table public.assets enable row level security;
 
--- 5. Helper Functions
+-- 5. Helper Functions & Triggers
 create or replace function public.is_admin()
 returns boolean as $$
   select exists (
@@ -73,13 +66,14 @@ begin
     new.email,
     new.raw_user_meta_data->>'full_name',
     new.raw_user_meta_data->>'avatar_url',
-    coalesce(new.raw_user_meta_data->>'role', 'client') -- Default to client if not specified
+    coalesce(new.raw_user_meta_data->>'role', 'client')
   );
   return new;
 end;
 $$ language plpgsql security definer;
 
--- Trigger for new user creation
+-- Note: If running this trigger fails due to permissions, you can remove it 
+-- and implement profile creation in your application logic (e.g., in actions/auth.ts).
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
@@ -87,78 +81,28 @@ create trigger on_auth_user_created
 -- 6. RLS Policies
 
 -- Profiles
-create policy "Public profiles are viewable by everyone"
-  on public.profiles for select
-  using ( true ); -- Or restrict to authenticated users
-
-create policy "Users can update own profile"
-  on public.profiles for update
-  using ( auth.uid() = id );
+create policy "Public profiles are viewable by everyone" on public.profiles for select using ( true );
+-- Allow users to insert their own profile (backup if trigger fails and we use app-side insert)
+create policy "Users can insert own profile" on public.profiles for insert with check ( auth.uid() = id );
+create policy "Users can update own profile" on public.profiles for update using ( auth.uid() = id );
 
 -- Projects
-create policy "Admins can view all projects"
-  on public.projects for select
-  using ( is_admin() );
-
-create policy "Admins can insert projects"
-  on public.projects for insert
-  with check ( is_admin() );
-
-create policy "Admins can update all projects"
-  on public.projects for update
-  using ( is_admin() );
-
-create policy "Clients can view own projects"
-  on public.projects for select
-  using ( auth.uid() = client_id );
+create policy "Admins can view all projects" on public.projects for select using ( is_admin() );
+create policy "Admins can insert projects" on public.projects for insert with check ( is_admin() );
+create policy "Admins can update all projects" on public.projects for update using ( is_admin() );
+create policy "Clients can view own projects" on public.projects for select using ( auth.uid() = client_id );
 
 -- Milestones
-create policy "Admins can do everything on milestones"
-  on public.milestones for all
-  using ( is_admin() );
-
-create policy "Clients can view milestones for their projects"
-  on public.milestones for select
-  using (
-    exists (
-      select 1 from public.projects
-      where projects.id = milestones.project_id
-      and projects.client_id = auth.uid()
-    )
-  );
-
-create policy "Clients can approve milestones (update is_approved)"
-  on public.milestones for update
-  using (
-    exists (
-      select 1 from public.projects
-      where projects.id = milestones.project_id
-      and projects.client_id = auth.uid()
-    )
-  )
-  with check (
-    -- Can only update is_approved, keeping other fields same is hard to enforce strictly in SQL policy without triggers or granular checks, 
-    -- but usually application layer handles validation too. 
-    -- For strictness, we'd use a separate function or simpler policy if possible.
-    -- For now, allowing update if you own the project is decent, strictly relying on app logic to only send is_approved updates.
-    exists (
-        select 1 from public.projects
-        where projects.id = milestones.project_id
-        and projects.client_id = auth.uid()
-    )
-  );
+create policy "Admins can do everything on milestones" on public.milestones for all using ( is_admin() );
+create policy "Clients can view milestones for their projects" on public.milestones for select using (
+    exists (select 1 from public.projects where projects.id = milestones.project_id and projects.client_id = auth.uid())
+);
+create policy "Clients can approve milestones" on public.milestones for update using (
+    exists (select 1 from public.projects where projects.id = milestones.project_id and projects.client_id = auth.uid())
+);
 
 -- Assets
-create policy "Admins can do everything on assets"
-  on public.assets for all
-  using ( is_admin() );
-
-create policy "Clients can view assets for their projects"
-  on public.assets for select
-  using (
-    exists (
-      select 1 from public.projects
-      where projects.id = assets.project_id
-      and projects.client_id = auth.uid()
-    )
-  );
+create policy "Admins can do everything on assets" on public.assets for all using ( is_admin() );
+create policy "Clients can view assets for their projects" on public.assets for select using (
+    exists (select 1 from public.projects where projects.id = assets.project_id and projects.client_id = auth.uid())
+);

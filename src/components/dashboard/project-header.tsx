@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button'
 import { Calendar, DollarSign, MoreHorizontal } from 'lucide-react'
 import type { Project } from '@/types'
 import Link from 'next/link'
+import { NewMilestoneDialog } from './new-milestone-dialog'
+import { ProjectSettingsDialog } from './project-settings-dialog'
 
 interface ProjectHeaderProps {
     project: Project
@@ -32,8 +34,8 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
                 </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">Edit Project</Button>
-                <Button size="sm">Add Milestone</Button>
+                <ProjectSettingsDialog project={project} />
+                <NewMilestoneDialog projectId={project.id} />
             </div>
         </div>
     )
