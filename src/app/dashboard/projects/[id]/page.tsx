@@ -57,7 +57,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
                 </div>
                 <div className="md:col-span-1 space-y-6">
                     {/* Sidebar: Assets & Info */}
-                    <AssetList assets={(assets as Asset[]) || []} />
+                    <AssetList assets={(assets as Asset[]) || []} projectId={id} />
 
                     {/* Could add Team member list or Activity feed here later */}
                 </div>

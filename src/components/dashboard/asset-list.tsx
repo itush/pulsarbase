@@ -4,34 +4,39 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Image as ImageIcon, Video, File } from 'lucide-react'
 import type { Asset } from '@/types'
 import Link from 'next/link'
+import { UploadAssetDialog } from './upload-asset-dialog'
 
 interface AssetListProps {
     assets: Asset[]
+    projectId: string
 }
 
-export function AssetList({ assets }: AssetListProps) {
+export function AssetList({ assets, projectId }: AssetListProps) {
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Assets & Files</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2">
-                {assets.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No assets uploaded yet.</p>
-                )}
-                {assets.map((asset) => (
-                    <Link
-                        key={asset.id}
-                        href={asset.file_url}
-                        target="_blank"
-                        className="flex items-center space-x-4 rounded-md border p-3 hover:bg-muted font-medium text-sm transition-colors"
-                    >
-                        <FileIcon type={asset.type} />
-                        <span className="flex-1 truncate">{asset.name}</span>
-                    </Link>
-                ))}
-            </CardContent>
-        </Card>
+        <div className="space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Assets & Files</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-2">
+                    {assets.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No assets uploaded yet.</p>
+                    )}
+                    {assets.map((asset) => (
+                        <Link
+                            key={asset.id}
+                            href={asset.file_url}
+                            target="_blank"
+                            className="flex items-center space-x-4 rounded-md border p-3 hover:bg-muted font-medium text-sm transition-colors"
+                        >
+                            <FileIcon type={asset.type} />
+                            <span className="flex-1 truncate">{asset.name}</span>
+                        </Link>
+                    ))}
+                </CardContent>
+            </Card>
+            <UploadAssetDialog projectId={projectId} />
+        </div>
     )
 }
 
