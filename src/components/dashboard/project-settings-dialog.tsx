@@ -27,11 +27,40 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
 import { Settings, Trash2, Loader2, Save } from 'lucide-react'
 import { deleteProject } from '@/actions/delete-project'
+import { updateProject } from '@/actions/update-project'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
 import type { Project } from '@/types'
+
+const formSchema = z.object({
+    name: z.string().min(3, {
+        message: 'Project name must be at least 3 characters.',
+    }),
+    status: z.enum(['active', 'completed', 'paused']),
+    total_budget: z.string().optional().nullable(),
+})
 
 interface ProjectSettingsDialogProps {
     project: Project
@@ -40,7 +69,39 @@ interface ProjectSettingsDialogProps {
 export function ProjectSettingsDialog({ project }: ProjectSettingsDialogProps) {
     const [open, setOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [isUpdating, setIsUpdating] = useState(false)
     const router = useRouter()
+
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            name: project.name,
+            status: project.status as any,
+            total_budget: project.total_budget?.toString() || '',
+        },
+    })
+
+    async function onUpdateSubmit(values: z.infer<typeof formSchema>) {
+        setIsUpdating(true)
+        const formData = new FormData()
+        formData.append('name', values.name)
+        formData.append('status', values.status)
+        if (values.total_budget) formData.append('total_budget', values.total_budget)
+
+        try {
+            const result = await updateProject(project.id, {}, formData)
+            if (result.message === 'success') {
+                toast.success('Project updated successfully')
+                router.refresh()
+            } else {
+                toast.error(result.message)
+            }
+        } catch (error) {
+            toast.error('Failed to update project')
+        } finally {
+            setIsUpdating(false)
+        }
+    }
 
     async function handleDelete() {
         setIsDeleting(true)
@@ -84,15 +145,70 @@ export function ProjectSettingsDialog({ project }: ProjectSettingsDialogProps) {
                     </TabsList>
 
                     <TabsContent value="general" className="space-y-4 py-4">
-                        <div className="rounded-md border p-4 text-center text-sm text-muted-foreground">
-                            <p>Edit Form coming soon...</p>
-                            {/* We can re-use a variant of NewProjectForm here for editing */}
-                        </div>
-                        <div className="flex justify-end">
-                            <Button disabled>
-                                <Save className="mr-2 h-4 w-4" /> Save Changes
-                            </Button>
-                        </div>
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(onUpdateSubmit)} className="space-y-4">
+                                <FormField
+                                    control={form.control}
+                                    name="name"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Project Name</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Project Name" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="status"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Status</FormLabel>
+                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select status" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="active">Active</SelectItem>
+                                                        <SelectItem value="paused">Paused</SelectItem>
+                                                        <SelectItem value="completed">Completed</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="total_budget"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Budget (USD)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" placeholder="Budget" {...field} value={field.value || ''} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                                <div className="flex justify-end pt-2">
+                                    <Button type="submit" disabled={isUpdating}>
+                                        {isUpdating ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Save className="mr-2 h-4 w-4" />
+                                        )}
+                                        Save Changes
+                                    </Button>
+                                </div>
+                            </form>
+                        </Form>
                     </TabsContent>
 
                     <TabsContent value="advanced" className="space-y-4 py-4">
